@@ -8,18 +8,6 @@
     exit(1);
 }
 
-template <class T>
-std::unique_ptr<T> downcast_expr(std::unique_ptr<Expr> E){
-    std::unique_ptr<T> SubClass;
-    T* SubClassPtr = dynamic_cast<T*>(E.get());
-    if (!SubClassPtr){
-        return nullptr;
-    }
-    E.release();
-    SubClass.reset(SubClassPtr);
-    return SubClass;
-}
-
 static Token eat_token(TokenType tokenType, std::vector<Token>& tokens, size_t& pos){
     if (tokens[pos].tokenType != tokenType){
         unexpected_token(tokens, pos);
@@ -37,6 +25,7 @@ static Token pass_token(TokenType tokenType, std::vector<Token>& tokens, size_t&
 }
 
 static std::unique_ptr<Expr> parse_expr(Build& build, std::vector<Token>& tokens, size_t& pos){
+    fprintf(stdout, "parsing expr\n");
     if (tokens[pos].tokenType == '['){
         pass_token(TOKEN_OPEN_SQUARE_BRACK, tokens, pos);
         // array
@@ -44,13 +33,15 @@ static std::unique_ptr<Expr> parse_expr(Build& build, std::vector<Token>& tokens
         while (pos < tokens.size() && tokens[pos].tokenType != ']'){
             Token string_tok = eat_token(TOKEN_STRING, tokens, pos);
             arr.push_back(*string_tok.data.str);
-            pos++;
             if (pos < tokens.size() && tokens[pos].tokenType == ','){
                 pass_token(TOKEN_COMMA, tokens, pos);
             }
         }
         pass_token(TOKEN_CLOSE_SQUARE_BRACK, tokens, pos);
         return std::make_unique<Array>(arr);
+    } else if (tokens[pos].tokenType == TOKEN_STRING){
+        Token string_tok = pass_token(TOKEN_STRING, tokens, pos);
+        return std::make_unique<String>(*string_tok.data.str);
     } else {
         unexpected_token(tokens, pos);
     }
@@ -58,6 +49,8 @@ static std::unique_ptr<Expr> parse_expr(Build& build, std::vector<Token>& tokens
 
 static void parse_identifier(Build& build, std::vector<Token>& tokens, size_t& pos){
     Token tok_identifier = pass_token(TOKEN_IDENTIFIER, tokens, pos);
+    std::string identifier_str = *tok_identifier.data.str;
+    fprintf(stdout, "got function call : %s\n", identifier_str.c_str());
     if (tokens[pos].tokenType == '='){
         pass_token(TOKEN_EQUAL, tokens, pos);
         std::unique_ptr<Expr> expr = parse_expr(build, tokens, pos);
@@ -65,19 +58,20 @@ static void parse_identifier(Build& build, std::vector<Token>& tokens, size_t& p
             fprintf(stderr, "ERROR : expected array of string after equal");
         }
 
-        build.vars[*tok_identifier.data.str] = std::make_unique<Var>(*tok_identifier.data.str, std::move(expr));
+        build.vars[identifier_str] = std::make_unique<Var>(identifier_str, std::move(expr));
     } else if (tokens[pos].tokenType == '('){
         pass_token(TOKEN_OPEN_PAREN, tokens, pos);
-
+        std::vector<std::unique_ptr<Expr>> args;
         while (pos < tokens.size() && tokens[pos].tokenType != ')'){
-            // TODO
+            std::unique_ptr<Expr> expr = parse_expr(build, tokens, pos);
+            args.push_back(std::move(expr));
             if (tokens[pos].tokenType == ','){
                 pass_token(TOKEN_COMMA, tokens, pos);
             }
-            pos++;
         }
 
         pass_token(TOKEN_CLOSE_PAREN, tokens, pos);
+        interpret_function_call(build, identifier_str, std::move(args));
     } else {
         unexpected_token(tokens, pos);
     }

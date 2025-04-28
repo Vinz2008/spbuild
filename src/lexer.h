@@ -1,6 +1,8 @@
+#ifndef _LEXER_HEADER_
+#define _LEXER_HEADER_
+
 #include <vector>
 #include <string>
-#include <variant>
 
 #include <iostream>
 
@@ -72,3 +74,5 @@ public:
 std::vector<Token> lex(std::string_view file_content);
 
 void destroy_tokens(std::vector<Token> tokens);
+
+#endif

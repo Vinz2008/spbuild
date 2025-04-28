@@ -1,3 +1,1 @@
-
-sources = ["test.c", "test2.c"]
-exe("demo", sources)
+exe("demo", ["test.c", "test2.c"])

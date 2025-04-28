@@ -3,6 +3,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "file.h"
+#include "build.h"
 
 int main(int argc, char** argv){
     std::string filename = "build.sp";
@@ -20,6 +21,7 @@ int main(int argc, char** argv){
     std::vector<Token> tokens = lex(file_content);
     Build build = parse(tokens);
 
+    gen_build(std::move(build), MAKEFILE);
     destroy_tokens(tokens);
     return 0;
 }

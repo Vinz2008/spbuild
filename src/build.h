@@ -1,7 +1,7 @@
 #ifndef _BUILD_HEADER_
 #define _BUILD_HEADER_
 
-class Expr;
+#include "parser.h"
 
 #include <vector>
 #include <string>
@@ -10,6 +10,7 @@ class Expr;
 
 
 class Executable {
+public:
     std::string output_file;
     std::vector<std::string> sources;
     Executable(std::string output_file, std::vector<std::string> sources) : output_file(output_file), sources(sources) {}
@@ -28,5 +29,14 @@ public:
     std::vector<Executable> executables;
     Build(){}
 };
+
+void interpret_function_call(Build& build, std::string_view function_name, std::vector<std::unique_ptr<Expr>> args);
+
+enum BackendType {
+    NINJA,
+    MAKEFILE,
+};
+
+void gen_build(Build build, enum BackendType backend_type);
 
 #endif

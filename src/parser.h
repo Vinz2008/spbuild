@@ -1,11 +1,12 @@
 #ifndef _PARSER_HEADER_
 #define _PARSER_HEADER_
 
-#include "build.h"
+#include "lexer.h"
 
 
 #include <memory>
 
+class Build;
 
 class ExprType {
 public:
@@ -21,6 +22,12 @@ public:
 };
 
 // TODO : add more types of array
+
+class String : public Expr {
+public:
+    std::string s;
+    String(std::string s) : Expr(ExprType()), s(s) {}
+};
 
 class Array : public Expr {
 public:

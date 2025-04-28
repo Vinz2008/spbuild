@@ -65,7 +65,7 @@ std::vector<Token> lex(std::string_view file_content){
             pos++; // pass "
             std::string s_str = get_string_while(pos, file_content, [](char c){ return c != '\"' && c != '\''; }); // TODO : add support for escaping
             pos++; // pass "
-            Token tok_string = Token::identifier(s_str);
+            Token tok_string = Token::string(s_str);
             tokens.push_back(tok_string);
         } else if (is_start_identifier(file_content[pos])){
             std::string identifier_str = get_string_while(pos, file_content, [](char c){ return is_identifier(c); });
