@@ -170,7 +170,7 @@ static std::string get_out_filename(BackendType backend_type){
         case NINJA:
             return "build.ninja";
         case MAKEFILE:
-            return "Makefile.sp";
+            return "Makefile";
         default:
             fprintf(stderr, "unexpected build system : %d\n", backend_type);
             exit(1);
