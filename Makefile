@@ -23,7 +23,7 @@ clean:
 	rm -f $(OBJS)
 
 run: 
-	cd test && ../spbuild
+	cd example && ../spbuild
 
 
 release: set_release all
@@ -31,3 +31,20 @@ release: set_release all
 set_release: 
 	$(eval CXXFLAGS += -O3 -flto -DNDEBUG) 
 	$(eval LDFLAGS += -s -flto) 
+
+
+TESTS_DIR = test
+
+TESTS_OBJS = src/file.o src/lexer.o
+
+TESTS_SRCS = $(wildcard $(TESTS_DIR)/*.cpp)
+TESTS_OBJS += $(patsubst %.cpp,%.o,$(TESTS_SRCS))
+
+TESTS_LDFLAGS = $(shell pkg-config --libs gmock)
+
+
+$(TESTS_DIR)/test-runner: $(TESTS_OBJS)
+	$(CXX) -o $@ $^ $(TESTS_LDFLAGS)
+
+test: $(TESTS_DIR)/test-runner
+	$(TESTS_DIR)/test-runner

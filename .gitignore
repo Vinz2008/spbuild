@@ -1,6 +1,6 @@
 *.o
 spbuild
-test/Makefile
+example/Makefile
 build.ninja
 .ninja_log
 demo

@@ -38,6 +38,21 @@ protected:
 public:
     Token(TokenType tokenType) : tokenType(tokenType) {}
 
+    friend bool operator==(const Token& lhs, const Token& rhs){
+        if (lhs.tokenType != rhs.tokenType){
+            return false;
+        }
+        switch (lhs.tokenType){
+            case TOKEN_IDENTIFIER:
+            case TOKEN_STRING:
+                return *lhs.data.str == *rhs.data.str;
+            case TOKEN_NB:
+                return lhs.data.nb == rhs.data.nb;
+            default:
+                return true;
+        }
+    }
+
 
     // constructors
     static Token number(long nb){
@@ -46,16 +61,21 @@ public:
         return tok;
     }
 
-    static Token identifier(std::string i){
-        Token tok = Token(TOKEN_IDENTIFIER);
-        tok.data.str = new std::string(i);
+private:
+    static Token token_with_string_data(TokenType tokenType, std::string s){
+        Token tok = Token(tokenType);
+        tok.data.str = new std::string(s);
         return tok;
     }
 
+public:
+
+    static Token identifier(std::string i){
+        return token_with_string_data(TOKEN_IDENTIFIER, i);
+    }
+
     static Token string(std::string s){
-        Token tok = Token(TOKEN_STRING);
-        tok.data.str = new std::string(s);
-        return tok;
+        return token_with_string_data(TOKEN_STRING, s);
     }
 
     // if auto destructor, problem with vecs
