@@ -24,8 +24,23 @@ static Token pass_token(TokenType tokenType, std::vector<Token>& tokens, size_t&
     return tok;
 }
 
+
+static std::unique_ptr<Expr> parse_expr(Build& build, std::vector<Token>& tokens, size_t& pos);
+
+static std::vector<std::unique_ptr<Expr>> parse_function_args(Build& build, std::vector<Token>& tokens, size_t& pos){
+    std::vector<std::unique_ptr<Expr>> args;
+    while (pos < tokens.size() && tokens[pos].tokenType != ')'){
+        std::unique_ptr<Expr> expr = parse_expr(build, tokens, pos);
+        args.push_back(std::move(expr));
+        if (tokens[pos].tokenType == ','){
+            pass_token(TOKEN_COMMA, tokens, pos);
+        }
+    }
+    return args;
+}
+
 static std::unique_ptr<Expr> parse_expr(Build& build, std::vector<Token>& tokens, size_t& pos){
-    fprintf(stdout, "parsing expr\n");
+    //fprintf(stdout, "parsing expr\n");
     if (tokens[pos].tokenType == '['){
         pass_token(TOKEN_OPEN_SQUARE_BRACK, tokens, pos);
         // array
@@ -42,6 +57,13 @@ static std::unique_ptr<Expr> parse_expr(Build& build, std::vector<Token>& tokens
     } else if (tokens[pos].tokenType == TOKEN_STRING){
         Token string_tok = pass_token(TOKEN_STRING, tokens, pos);
         return std::make_unique<String>(*string_tok.data.str);
+    } else if (tokens[pos].tokenType == TOKEN_IDENTIFIER){
+        Token tok_identifier = pass_token(TOKEN_IDENTIFIER, tokens, pos);
+        std::string identifier_str = *tok_identifier.data.str;
+        eat_token(TOKEN_OPEN_PAREN, tokens, pos);
+        std::vector<std::unique_ptr<Expr>> args = parse_function_args(build, tokens, pos);
+        pass_token(TOKEN_CLOSE_PAREN, tokens, pos);
+        return interpret_expr_function_call(identifier_str, std::move(args));
     } else {
         unexpected_token(tokens, pos);
     }
@@ -50,7 +72,6 @@ static std::unique_ptr<Expr> parse_expr(Build& build, std::vector<Token>& tokens
 static void parse_identifier(Build& build, std::vector<Token>& tokens, size_t& pos){
     Token tok_identifier = pass_token(TOKEN_IDENTIFIER, tokens, pos);
     std::string identifier_str = *tok_identifier.data.str;
-    fprintf(stdout, "got function call : %s\n", identifier_str.c_str());
     if (tokens[pos].tokenType == '='){
         pass_token(TOKEN_EQUAL, tokens, pos);
         std::unique_ptr<Expr> expr = parse_expr(build, tokens, pos);
@@ -60,18 +81,13 @@ static void parse_identifier(Build& build, std::vector<Token>& tokens, size_t& p
 
         build.vars[identifier_str] = std::make_unique<Var>(identifier_str, std::move(expr));
     } else if (tokens[pos].tokenType == '('){
+        fprintf(stdout, "got toplevel function call : %s\n", identifier_str.c_str());
         pass_token(TOKEN_OPEN_PAREN, tokens, pos);
-        std::vector<std::unique_ptr<Expr>> args;
-        while (pos < tokens.size() && tokens[pos].tokenType != ')'){
-            std::unique_ptr<Expr> expr = parse_expr(build, tokens, pos);
-            args.push_back(std::move(expr));
-            if (tokens[pos].tokenType == ','){
-                pass_token(TOKEN_COMMA, tokens, pos);
-            }
-        }
+
+        std::vector<std::unique_ptr<Expr>> args = parse_function_args(build, tokens, pos);
 
         pass_token(TOKEN_CLOSE_PAREN, tokens, pos);
-        interpret_function_call(build, identifier_str, std::move(args));
+        interpret_toplevel_function_call(build, identifier_str, std::move(args));
     } else {
         unexpected_token(tokens, pos);
     }

@@ -30,12 +30,16 @@ public:
     Build(){}
 };
 
-void interpret_function_call(Build& build, std::string_view function_name, std::vector<std::unique_ptr<Expr>> args);
+void interpret_toplevel_function_call(Build& build, std::string_view function_name, std::vector<std::unique_ptr<Expr>> args);
+
+std::unique_ptr<Expr> interpret_expr_function_call(std::string_view function_name, std::vector<std::unique_ptr<Expr>> args);
 
 enum BackendType {
     NINJA,
     MAKEFILE,
 };
+
+BackendType parse_backend_type(std::string backend_str);
 
 void gen_build(Build build, enum BackendType backend_type);
 

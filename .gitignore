@@ -1,3 +1,6 @@
 *.o
 spbuild
 Makefile.sp
+build.ninja
+.ninja_log
+demo

@@ -6,9 +6,22 @@
 #include "build.h"
 
 int main(int argc, char** argv){
+    std::string backend = "";
     std::string filename = "build.sp";
     for (int i = 1; i < argc; i++){
-        filename = argv[i];
+        std::string arg = argv[i];
+        if (arg == "-G"){
+            i++;
+            backend = argv[i];
+        } else {
+            filename = arg;
+        }
+    }
+
+
+    BackendType backend_type = NINJA;
+    if (backend != ""){
+        backend_type = parse_backend_type(backend);
     }
 
     if (!file_exists(filename)){
@@ -21,7 +34,7 @@ int main(int argc, char** argv){
     std::vector<Token> tokens = lex(file_content);
     Build build = parse(tokens);
 
-    gen_build(std::move(build), MAKEFILE);
+    gen_build(std::move(build), backend_type);
     destroy_tokens(tokens);
     return 0;
 }

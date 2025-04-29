@@ -1,44 +1,168 @@
 #include "build.h"
-#include "utils.h"
 #include <fstream>
+#include <sstream>
+#include "utils.h"
+#include "file.h"
 
-
-void interpret_function_call(Build& build, std::string_view function_name, std::vector<std::unique_ptr<Expr>> args){
+void interpret_toplevel_function_call(Build& build, std::string_view function_name, std::vector<std::unique_ptr<Expr>> args){
     if (function_name == "exe"){
         std::unique_ptr<String> out_filename = downcast_expr<String>(std::move(args[0]));
         std::unique_ptr<Array> sources = downcast_expr<Array>(std::move(args[1]));
         build.executables.push_back(Executable(out_filename->s, sources->arr));
     } else {
+        fprintf(stderr, "ERROR : unknown toplevel function name %s\n", function_name.data());
+    }
+}
+
+struct WildcardFormat {
+    std::string folder;
+    std::string extension;
+    WildcardFormat(std::string folder, std::string extension) : folder(folder), extension(extension) {}
+};
+
+static WildcardFormat parse_wildcard_format(std::string format){
+    int slash_pos = format.size() - 1;
+    while (format[slash_pos] != '/'){
+        slash_pos--;
+    }
+    std::string folder = format.substr(0, slash_pos);
+    
+    if (format[slash_pos+1] != '*'){
+        fprintf(stderr, "ERROR : missing '*' in wildcard format");
+        exit(1);
+    }
+
+    int dot_pos = slash_pos+2;
+    if (format[dot_pos] != '.'){
+        fprintf(stderr, "ERROR : missing '.' in wildcard format extension");
+        exit(1);
+    }
+
+    std::string extension = format.substr(dot_pos, format.size()-1);
+
+    return WildcardFormat(folder, extension);
+}
+
+std::unique_ptr<Expr> interpret_expr_function_call(std::string_view function_name, std::vector<std::unique_ptr<Expr>> args){
+    if (function_name == "wildcard"){
+        // format in pattern 'folder/*.ext', ex : 'src/*.c'
+        std::unique_ptr<String> format_expr = downcast_expr<String>(std::move(args[0]));
+        WildcardFormat wildcard_format = parse_wildcard_format(format_expr->s);
+        std::vector<std::string> files = wildcard_files(wildcard_format.folder, wildcard_format.extension);
+        return std::make_unique<Array>(files);
+    } else {
         fprintf(stderr, "ERROR : unknown function name %s\n", function_name.data());
+        exit(1);
     }
 }
 
 
-static void gen_build_ninja(Build build, std::ofstream& stream){
-    fprintf(stderr, "TODO");
-    exit(1);
+BackendType parse_backend_type(std::string backend_str){
+    if (backend_str == "Ninja"){
+        return NINJA;
+    } else if (backend_str == "Makefile"){
+        return MAKEFILE;
+    } else {
+        fprintf(stderr, "ERROR : unexpected backend\n");
+        exit(1);
+    }
+}
+
+static std::string get_c_compiler(){
+    // return TODO
+    return "cc";
 }
 
 
+// TODO : merge these code
+// ex : instead of the two lines with the cc line, add a function called set_c_compiler which will write to the build file in function of the build type and call it : set_c_compiler(get_c_compiler())
 
+static std::vector<std::string> get_obj_files(std::vector<std::string> sources){
+    std::vector<std::string> objs;
+    for (uint i = 0; i < sources.size(); i++){
+        objs.push_back(sources[i] + ".o");
+    }
+    return objs;
+}
 
-static void gen_build_makefile(Build build, std::ofstream& stream){
-    //stream << ".SUFFIXES: .c .S .o\n\n"; // TODO
+// TODO : support for cpp, rust, etc
 
-    for (int i = 0; i < build.executables.size(); i++){
-        stream << build.executables[i].output_file << ": ";
-        for (int j = 0; j < build.executables[i].sources.size(); j++){
-            stream << build.executables[i].sources[j] + ".o" << " ";
+static std::string gen_build_ninja(Build build){
+    std::stringstream stream;
+    stream << "cc = " << get_c_compiler() << "\n\n";
+    stream << "rule cc\n";
+    stream << "  command = $cc $cflags -c -o $out $in\n\n";
+    stream << "rule ld\n";
+    stream << "  command = $cc -o $out $in $ldflags\n\n";
+    for (uint i = 0; i < build.executables.size(); i++){
+        stream << "build " << build.executables[i].output_file << ": ld ";
+        std::vector<std::string> objs = get_obj_files(build.executables[i].sources);
+        for (uint j = 0; j < objs.size(); j++){
+            stream << objs[j] << " ";
         }
-        stream << "\n\n";
+        stream << "\n";
 
-        for (int j = 0; j < build.executables[i].sources.size(); j++){
+
+        for (uint j = 0; j < build.executables[i].sources.size(); j++){
             std::string source_file = build.executables[i].sources[j];
-            std::string object_file = source_file + ".o";
+            std::string object_file = objs[j];
+            // TODO : add support for deps (either generate .d files or get header list from compiler and add to the deps)
+            stream << "build " << object_file << ": cc " << source_file << "\n";
+        }
+    }
+    return stream.str();
+}
+
+static void gen_makefile_clean(std::stringstream& stream, std::vector<std::string>& files){
+    stream << "clean:\n";
+    stream << "\trm -f ";
+    for (uint i = 0; i < files.size(); i++){
+        stream << files[i] << " ";
+    }
+    stream << "\n\n";
+}
+
+static std::string gen_build_makefile(Build build){
+    //stream << ".SUFFIXES: .c .S .o\n\n"; // TODO
+    std::stringstream stream;
+    // TODO : only add this if needed
+    stream << "CC = " << get_c_compiler() << "\n";
+
+    std::vector<std::string> all_objs;
+
+    for (uint i = 0; i < build.executables.size(); i++){
+        stream << build.executables[i].output_file << ": ";
+        
+        std::vector<std::string> objs = get_obj_files(build.executables[i].sources);
+        for (uint j = 0; j < objs.size(); j++){
+            stream << objs[j] << " ";
+        }
+        stream << "\n";
+
+        stream << "\t$(CC) -o " << build.executables[i].output_file << " ";
+        for (uint j = 0; j < objs.size(); j++){
+            stream << objs[j] << " ";
+        }
+
+        stream << "$(LDFLAGS)\n\n";
+
+
+        
+
+        for (uint j = 0; j < build.executables[i].sources.size(); j++){
+            std::string source_file = build.executables[i].sources[j];
+            std::string object_file = objs[j];
             stream << object_file << ":\n";
             stream <<  "\t$(CC) $(CFLAGS) -c -o " << object_file << " " << source_file <<  " \n\n";
         }
+        
+        all_objs.push_back(build.executables[i].output_file);
+        all_objs.insert(all_objs.end(), objs.begin(), objs.end());
     }
+
+    gen_makefile_clean(stream, all_objs);
+
+    return stream.str();
 }
 
 static std::string get_out_filename(BackendType backend_type){
@@ -54,16 +178,18 @@ static std::string get_out_filename(BackendType backend_type){
 }
 
 void gen_build(Build build, BackendType backend_type){
-    std::string out_filename = get_out_filename(backend_type);
-    std::ofstream f(out_filename);
+    std::string file_content = "";
     if (backend_type == NINJA){
-        gen_build_ninja(std::move(build), f);
+        file_content = gen_build_ninja(std::move(build));
     } else if (backend_type == MAKEFILE){
-        gen_build_makefile(std::move(build), f);
+        file_content = gen_build_makefile(std::move(build));
     } else {
         fprintf(stderr, "unexpected build system : %d\n", backend_type);
         exit(1);
     }
 
+    std::string out_filename = get_out_filename(backend_type);
+    std::ofstream f(out_filename);
+    f.write(file_content.c_str(), file_content.size());
     f.close();
 }
