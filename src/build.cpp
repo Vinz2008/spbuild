@@ -70,11 +70,6 @@ BackendType parse_backend_type(std::string backend_str){
     }
 }
 
-/*static std::string get_c_compiler_path(){
-    // return TODO
-    return "cc";
-}*/
-
 
 // TODO : merge these code
 // ex : instead of the two lines with the cc line, add a function called set_c_compiler which will write to the build file in function of the build type and call it : set_c_compiler(get_c_compiler())
@@ -106,41 +101,6 @@ static std::string get_linker_var(BackendType backend_type){
     return get_c_compiler_var(backend_type);
 }
 
-/*static void set_cc_compiler(BackendType backend_type, std::stringstream& stream, std::string path){
-    switch (backend_type){
-        case NINJA:
-            break;
-        case MAKEFILE:
-
-    }
-}*/
-
-/*static std::string gen_build_ninja(Build build){
-    std::stringstream stream;
-    stream << "cc = " << get_c_compiler_path() << "\n\n";
-    stream << "rule cc\n";
-    stream << "  command = $cc $cflags -c -o $out $in\n\n";
-    stream << "rule ld\n";
-    stream << "  command = " << get_linker_var() << " -o $out $in $ldflags\n\n";
-    for (uint i = 0; i < build.executables.size(); i++){
-        stream << "build " << build.executables[i].output_file << ": ld ";
-        std::vector<std::string> objs = get_obj_files(build.executables[i].sources);
-        for (uint j = 0; j < objs.size(); j++){
-            stream << objs[j] << " ";
-        }
-        stream << "\n";
-
-
-        for (uint j = 0; j < build.executables[i].sources.size(); j++){
-            std::string source_file = build.executables[i].sources[j];
-            std::string object_file = objs[j];
-            // TODO : add support for deps (either generate .d files or get header list from compiler and add to the deps)
-            stream << "build " << object_file << ": cc " << source_file << "\n";
-        }
-    }
-    return stream.str();
-}*/
-
 static void gen_makefile_clean(std::stringstream& stream, std::vector<std::string>& files){
     stream << "clean:\n";
     stream << "\trm -f ";
@@ -149,49 +109,6 @@ static void gen_makefile_clean(std::stringstream& stream, std::vector<std::strin
     }
     stream << "\n\n";
 }
-
-/*static std::string gen_build_makefile(Build build){
-    //stream << ".SUFFIXES: .c .S .o\n\n"; // TODO
-    std::stringstream stream;
-    // TODO : only add this if needed
-    stream << "CC = " << get_c_compiler() << "\n";
-
-    std::vector<std::string> all_objs;
-
-    for (uint i = 0; i < build.executables.size(); i++){
-        stream << build.executables[i].output_file << ": ";
-        
-        std::vector<std::string> objs = get_obj_files(build.executables[i].sources);
-        for (uint j = 0; j < objs.size(); j++){
-            stream << objs[j] << " ";
-        }
-        stream << "\n";
-
-        stream << "\t$(CC) -o " << build.executables[i].output_file << " ";
-        for (uint j = 0; j < objs.size(); j++){
-            stream << objs[j] << " ";
-        }
-
-        stream << "$(LDFLAGS)\n\n";
-
-
-        
-
-        for (uint j = 0; j < build.executables[i].sources.size(); j++){
-            std::string source_file = build.executables[i].sources[j];
-            std::string object_file = objs[j];
-            stream << object_file << ":\n";
-            stream <<  "\t$(CC) $(CFLAGS) -c -o " << object_file << " " << source_file <<  " \n\n";
-        }
-        
-        all_objs.push_back(build.executables[i].output_file);
-        all_objs.insert(all_objs.end(), objs.begin(), objs.end());
-    }
-
-    gen_makefile_clean(stream, all_objs);
-
-    return stream.str();
-}*/
 
 static void add_generic_linker_rule(BackendType backend_type, std::stringstream& stream){
     assert(backend_type != MAKEFILE);
@@ -288,14 +205,6 @@ static std::string get_out_filename(BackendType backend_type){
 
 void gen_build(Build build, BackendType backend_type){
     std::string file_content = gen_build_backend(std::move(build), backend_type);
-    /*if (backend_type == NINJA){
-        file_content = gen_build_ninja(std::move(build));
-    } else if (backend_type == MAKEFILE){
-        file_content = gen_build_makefile(std::move(build));
-    } else {
-        fprintf(stderr, "unexpected build system : %d\n", backend_type);
-        exit(1);
-    }*/
 
     std::string out_filename = get_out_filename(backend_type);
     std::ofstream f(out_filename);
