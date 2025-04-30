@@ -1,6 +1,7 @@
 #include "lang.h"
 #include <sstream>
 #include "build.h"
+#include "file.h"
 
 static std::string get_c_compiler_path(){
     // return TODO
@@ -17,7 +18,6 @@ static void set_cc_compiler(BackendType backend_type, std::stringstream& stream,
         case MAKEFILE:
             stream << "CC = " << path << "\n\n";
             break;
-
     }
 }
 
@@ -32,6 +32,8 @@ static void add_rules_for_c(BackendType backend_type, std::stringstream& stream)
             break;
     }
 }
+
+
 
 void add_language_support(BackendType backend_type, Language lang, std::stringstream& stream){
     switch (lang){

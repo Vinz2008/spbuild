@@ -38,7 +38,7 @@ std::vector<std::string> wildcard_files(std::string folder, std::string extensio
 
     for (const auto& dir_entry : fs::directory_iterator(folder)) {
         if (dir_entry.is_regular_file()){
-            const auto file_path = dir_entry.path().string();
+            const std::string file_path = dir_entry.path().string();
             if (get_extension(file_path) == extension){
                 files.push_back(file_path);
             }
@@ -48,4 +48,38 @@ std::vector<std::string> wildcard_files(std::string folder, std::string extensio
     }
 
     return files;
+}
+
+static std::vector<std::string> split(std::string_view s, char delim){
+    std::vector<std::string> res;
+
+    int next_delim_pos = s.find(delim);
+
+    while (next_delim_pos != -1){
+        res.push_back(std::string(s.substr(0, next_delim_pos)));
+        s = s.substr(next_delim_pos+1, s.size()-1);
+        next_delim_pos = s.find(delim);
+    }
+
+    return res;
+}
+
+bool exe_is_in_path(std::string program){
+    std::string path_var = getenv("PATH");
+    std::vector<std::string> paths = split(path_var, ':');
+
+    for (uint i = 0; i < paths.size(); i++){
+        for (const auto& dir_entry : fs::directory_iterator(paths[i])) {
+            if (dir_entry.is_regular_file()){
+                const std::string file_path = dir_entry.path().filename().string();
+                if (file_path == program){
+                    return true;
+                }
+            }
+    
+        }
+    }
+
+    return false;
+    
 }

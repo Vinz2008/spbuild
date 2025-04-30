@@ -117,6 +117,26 @@ static void add_generic_linker_rule(BackendType backend_type, std::stringstream&
     
 }
 
+static void set_ldflags_var(BackendType backend_type, std::stringstream& stream, std::string ldflags){
+    switch (backend_type){
+        case NINJA:
+            stream << "ldflags = " << ldflags << "\n\n";
+            break;
+        case MAKEFILE:
+            stream << "LDFLAGS = " << ldflags << "\n\n";
+            break;
+    }
+}
+
+static void set_ldflags(BackendType backend_type, std::stringstream& stream){
+    std::string ldflags = "";
+    if (exe_is_in_path("mold")){
+        ldflags += "-fuse-ld=mold";
+    }
+
+    set_ldflags_var(backend_type, stream, ldflags);
+}
+
 static void gen_exe_target(BackendType backend_type, std::stringstream& stream, std::string output_file, std::vector<std::string>& objs){
     switch (backend_type){
         case NINJA:
@@ -158,6 +178,9 @@ static void gen_source_target(BackendType backend_type, std::stringstream& strea
 static std::string gen_build_backend(Build build, BackendType backend_type){
     std::stringstream stream;
     add_language_support(backend_type, C, stream);
+
+    set_ldflags(backend_type, stream);
+
     if (backend_type != MAKEFILE){
         add_generic_linker_rule(backend_type, stream);
     }
