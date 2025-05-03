@@ -57,12 +57,8 @@ std::vector<Token> lex(std::string_view file_content){
             pass_string_while(pos, file_content, [](char c){ return is_whitespace(c); });
         } else if (file_content[pos] == '\n'){
             pos++;
-        } else if (file_content[pos] == '/'){
+        } else if (file_content[pos] == '#'){
             pos++;
-            if (file_content[pos] != '/'){
-                fprintf(stderr, "ERROR : unexpected '/' (missing second slash for comment)\n");
-                exit(1);
-            }
             while (pos < file_content.length() && file_content[pos] != '\n'){
                 pos++;
             }

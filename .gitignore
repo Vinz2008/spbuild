@@ -4,3 +4,4 @@ example/Makefile
 build.ninja
 .ninja_log
 demo
+demo2

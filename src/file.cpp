@@ -80,6 +80,12 @@ bool exe_is_in_path(std::string program){
         }
     }
 
-    return false;
-    
+    return false;    
+}
+
+
+
+std::string_view strip_file_extension(std::string_view filename){
+    fs::path p = filename;
+    return p.replace_extension().string();
 }

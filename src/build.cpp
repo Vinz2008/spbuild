@@ -2,15 +2,29 @@
 #include <fstream>
 #include <sstream>
 #include <cassert>
+#include <set>
 #include "utils.h"
 #include "file.h"
 #include "lang.h"
+
+static const std::string_view ldflags_global = std::string_view("ldflags_global");
+
+// deduplicated targets, there could be a problem with different cflags/configs (TODO)
+std::set<std::string> targets_added;
 
 void interpret_toplevel_function_call(Build& build, std::string_view function_name, std::vector<std::unique_ptr<Expr>> args){
     if (function_name == "exe"){
         std::unique_ptr<String> out_filename = downcast_expr<String>(std::move(args[0]));
         std::unique_ptr<Array> sources = downcast_expr<Array>(std::move(args[1]));
-        build.executables.push_back(Executable(out_filename->s, sources->arr));
+        std::vector<std::string> libraries;
+        if (args.size() >= 3){
+            std::unique_ptr<Array> libraries_expr = downcast_expr<Array>(std::move(args[2]));
+            libraries = libraries_expr->arr;
+        }
+        build.executables.push_back(Executable(out_filename->s, sources->arr, libraries));
+    } else if (function_name == "cc"){
+        std::unique_ptr<String> cc_path = downcast_expr<String>(std::move(args[0]));
+        build.compiler_paths[C] = cc_path->s; 
     } else {
         fprintf(stderr, "ERROR : unknown toplevel function name %s\n", function_name.data());
     }
@@ -82,10 +96,28 @@ static std::vector<std::string> get_obj_files(std::vector<std::string> sources){
     return objs;
 }
 
+
+static void set_build_var(std::stringstream& stream, std::string_view var_name, std::string_view val){
+    stream << var_name << " = " << val << "\n\n";
+}
+
+static std::string get_build_var(BackendType backend_type, std::string var_name){
+    switch (backend_type){
+        case NINJA:
+            return "$" + var_name;
+        case MAKEFILE:
+            return "$(" + var_name + ")";
+        default:
+            fprintf(stderr, "ERROR : unknown backend\n");
+            exit(1);
+    }
+}
+
 // TODO : support for cpp, rust, etc
 
 static std::string get_c_compiler_var(BackendType backend_type){
-    switch (backend_type){
+    return get_build_var(backend_type, "cc");
+    /*switch (backend_type){
         case NINJA:
             return "$cc";
         case MAKEFILE:
@@ -93,7 +125,7 @@ static std::string get_c_compiler_var(BackendType backend_type){
         default:
             fprintf(stderr, "ERROR : unknown backend\n");
             exit(1);
-    }
+    }*/
 }
 
 
@@ -110,34 +142,58 @@ static void gen_makefile_clean(std::stringstream& stream, std::vector<std::strin
     stream << "\n\n";
 }
 
+static void add_makefile_all_target(Build& build, std::stringstream& stream){
+    stream << "all: ";
+    for (uint i = 0; i < build.executables.size(); i++){
+        stream << build.executables[i].output_file << " ";
+    }
+    stream  << "\n\n";
+}
+
 static void add_generic_linker_rule(BackendType backend_type, std::stringstream& stream){
     assert(backend_type != MAKEFILE);
     stream << "rule ld\n";
-    stream << "  command = " << get_linker_var(backend_type) << " -o $out $in $ldflags\n\n";
+    stream << "  command = " << get_linker_var(backend_type) << " -o $out $in $ldflags\n\n";   
+}
+
+/*static void set_ldflags_global_var(std::stringstream& stream, std::string ldflags){
+    set_build_var(stream, "ldflags_global", ldflags);
     
-}
+    // switch (backend_type){
+    //     case NINJA:
+    //         stream << "ldflags = " << ldflags << "\n\n";
+    //         break;
+    //     case MAKEFILE:
+    //         stream << "LDFLAGS = " << ldflags << "\n\n";
+    //         break;
+    // }
+}*/
 
-static void set_ldflags_var(BackendType backend_type, std::stringstream& stream, std::string ldflags){
-    switch (backend_type){
-        case NINJA:
-            stream << "ldflags = " << ldflags << "\n\n";
-            break;
-        case MAKEFILE:
-            stream << "LDFLAGS = " << ldflags << "\n\n";
-            break;
-    }
-}
-
-static void set_ldflags(BackendType backend_type, std::stringstream& stream){
-    std::string ldflags = "";
+static void set_ldflags_global(/*BackendType backend_type,*/ std::stringstream& stream){
+    std::string ldflags = " ";
     if (exe_is_in_path("mold")){
-        ldflags += "-fuse-ld=mold";
+        ldflags += "-fuse-ld=mold ";
     }
 
-    set_ldflags_var(backend_type, stream, ldflags);
+    //set_ldflags_global_var(/*backend_type,*/ stream, ldflags);
+    set_build_var(stream, "ldflags_global", ldflags);
 }
 
-static void gen_exe_target(BackendType backend_type, std::stringstream& stream, std::string output_file, std::vector<std::string>& objs){
+static std::string get_exe_ldflags(std::vector<std::string>& libraries){
+    // TODO
+    return "";
+}
+
+static void gen_exe_target(BackendType backend_type, std::stringstream& stream, std::string output_file, std::vector<std::string>& objs, std::vector<std::string>& libraries){
+    if (targets_added.find(output_file) != targets_added.end()){
+        return;
+    }
+    
+    // TODO : only add specific vars when needed
+    std::string ldflags_specific_name = "ldflags_" + (std::string)strip_file_extension(output_file);
+    std::string ldflags_specific_val = get_build_var(backend_type, "ldflags_global") + " " + get_exe_ldflags(libraries);
+    set_build_var(stream, ldflags_specific_name, ldflags_specific_val);
+    
     switch (backend_type){
         case NINJA:
             stream << "build " << output_file << ": ld ";
@@ -151,17 +207,27 @@ static void gen_exe_target(BackendType backend_type, std::stringstream& stream, 
     }
     stream << "\n";
 
-    if (backend_type == MAKEFILE){
-        stream << "\t" << get_linker_var(backend_type) << " $(LDFLAGS) -o " << output_file << " ";
-        for (uint j = 0; j < objs.size(); j++){
-            stream << objs[j] << " ";
-        }
-        stream << " \n\n";
+    switch (backend_type){
+        case MAKEFILE:
+            stream << "\t" << get_linker_var(backend_type) << " $(" << ldflags_specific_name << ") -o " << output_file << " ";
+            for (uint j = 0; j < objs.size(); j++){
+                stream << objs[j] << " ";
+            }
+            stream << " \n\n";
+            break;
+        case NINJA:
+            stream << "  ldflags = $" << ldflags_specific_name << "\n\n";
+            break;
     }
+    targets_added.insert(output_file);
     
 }
 
 static void gen_source_target(BackendType backend_type, std::stringstream& stream, std::string source_file, std::string object_file){
+    if (targets_added.find(object_file) != targets_added.end()){
+        return;
+    }
+
     // TODO : add function to lang.cpp to get compiler for language
     switch (backend_type){
         case NINJA:
@@ -169,20 +235,26 @@ static void gen_source_target(BackendType backend_type, std::stringstream& strea
             break;
         case MAKEFILE:
             stream << object_file << ":\n";
-            stream <<  "\t$(CC) $(CFLAGS) -c -o " << object_file << " " << source_file <<  " \n\n";
+            stream <<  "\t$(cc) $(CFLAGS) -c -o " << object_file << " " << source_file <<  " \n\n";
             break;
     }
-    
+
+    targets_added.insert(object_file);
 }
 
 static std::string gen_build_backend(Build build, BackendType backend_type){
     std::stringstream stream;
-    add_language_support(backend_type, C, stream);
+    add_language_support(build, backend_type, C, stream);
 
-    set_ldflags(backend_type, stream);
+    set_ldflags_global(/*backend_type,*/ stream);
 
     if (backend_type != MAKEFILE){
         add_generic_linker_rule(backend_type, stream);
+    }
+
+
+    if (backend_type == MAKEFILE){
+        add_makefile_all_target(build, stream);
     }
 
     std::vector<std::string> all_objs;
@@ -193,7 +265,7 @@ static std::string gen_build_backend(Build build, BackendType backend_type){
         std::vector<std::string> objs = get_obj_files(build.executables[i].sources);
         
 
-        gen_exe_target(backend_type, stream, build.executables[i].output_file, objs);
+        gen_exe_target(backend_type, stream, build.executables[i].output_file, objs, build.executables[i].libraries);
         
 
         for (uint j = 0; j < build.executables[i].sources.size(); j++){

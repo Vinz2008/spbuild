@@ -7,13 +7,15 @@
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include "lang.h"
 
 
 class Executable {
 public:
     std::string output_file;
     std::vector<std::string> sources;
-    Executable(std::string output_file, std::vector<std::string> sources) : output_file(output_file), sources(sources) {}
+    std::vector<std::string> libraries;
+    Executable(std::string output_file, std::vector<std::string> sources, std::vector<std::string> libraries) : output_file(output_file), sources(sources), libraries(libraries) {}
 };
 
 class Var {
@@ -26,6 +28,7 @@ public:
 class Build {
 public:
     std::unordered_map<std::string, std::unique_ptr<Var>> vars;
+    std::unordered_map<Language, std::string, EnumClassHash> compiler_paths;
     std::vector<Executable> executables;
     Build(){}
 };
@@ -34,13 +37,8 @@ void interpret_toplevel_function_call(Build& build, std::string_view function_na
 
 std::unique_ptr<Expr> interpret_expr_function_call(std::string_view function_name, std::vector<std::unique_ptr<Expr>> args);
 
-enum BackendType {
-    NINJA,
-    MAKEFILE,
-};
-
 BackendType parse_backend_type(std::string backend_str);
 
-void gen_build(Build build, enum BackendType backend_type);
+void gen_build(Build build, BackendType backend_type);
 
 #endif
