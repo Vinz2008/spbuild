@@ -98,7 +98,7 @@ BackendType parse_backend_type(std::string backend_str){
 
 static std::vector<std::string> get_obj_files(std::vector<std::string> sources){
     std::vector<std::string> objs;
-    for (uint i = 0; i < sources.size(); i++){
+    for (uint32_t i = 0; i < sources.size(); i++){
         objs.push_back(sources[i] + ".o");
     }
     return objs;
@@ -144,7 +144,7 @@ static std::string get_linker_var(BackendType backend_type){
 static void gen_makefile_clean(std::stringstream& stream, std::vector<std::string>& files){
     stream << "clean:\n";
     stream << "\trm -f ";
-    for (uint i = 0; i < files.size(); i++){
+    for (uint32_t i = 0; i < files.size(); i++){
         stream << files[i] << " ";
     }
     stream << "\n\n";
@@ -152,7 +152,7 @@ static void gen_makefile_clean(std::stringstream& stream, std::vector<std::strin
 
 static void add_makefile_all_target(Build& build, std::stringstream& stream){
     stream << "all: ";
-    for (uint i = 0; i < build.executables.size(); i++){
+    for (uint32_t i = 0; i < build.executables.size(); i++){
         stream << build.executables[i].output_file << " ";
     }
     stream  << "\n\n";
@@ -210,7 +210,7 @@ static void gen_exe_target(BackendType backend_type, std::stringstream& stream, 
             stream << output_file << ": ";
             break;
     }
-    for (uint j = 0; j < objs.size(); j++){
+    for (uint32_t j = 0; j < objs.size(); j++){
         stream << objs[j] << " ";
     }
     stream << "\n";
@@ -218,7 +218,7 @@ static void gen_exe_target(BackendType backend_type, std::stringstream& stream, 
     switch (backend_type){
         case MAKEFILE:
             stream << "\t" << get_linker_var(backend_type) << " $(" << ldflags_specific_name << ") -o " << output_file << " ";
-            for (uint j = 0; j < objs.size(); j++){
+            for (uint32_t j = 0; j < objs.size(); j++){
                 stream << objs[j] << " ";
             }
             stream << " \n\n";
@@ -267,7 +267,7 @@ static std::string gen_build_backend(Build build, BackendType backend_type){
 
     std::vector<std::string> all_objs;
 
-    for (uint i = 0; i < build.executables.size(); i++){
+    for (uint32_t i = 0; i < build.executables.size(); i++){
         
         
         std::vector<std::string> objs = get_obj_files(build.executables[i].sources);
@@ -276,7 +276,7 @@ static std::string gen_build_backend(Build build, BackendType backend_type){
         gen_exe_target(backend_type, stream, build.executables[i].output_file, objs, build.executables[i].libraries);
         
 
-        for (uint j = 0; j < build.executables[i].sources.size(); j++){
+        for (uint32_t j = 0; j < build.executables[i].sources.size(); j++){
             std::string source_file = build.executables[i].sources[j];
             std::string object_file = objs[j];
             gen_source_target(backend_type, stream, source_file, object_file);

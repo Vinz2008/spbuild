@@ -12,7 +12,7 @@ namespace fs = std::filesystem;
 std::string read_file(std::string_view filename){
     std::ifstream f(filename.cbegin(), std::ios::in);
 
-    const uintmax_t file_size = fs::file_size(filename);
+    const uint32_t file_size = fs::file_size(filename);
     std::string file_content = std::string(file_size, '\0');
     f.read(file_content.data(), file_size);
 
@@ -73,7 +73,7 @@ bool exe_is_in_path(std::string program){
     std::string path_var = getenv("PATH");
     std::vector<std::string> paths = split(path_var, ':');
 
-    for (uint i = 0; i < paths.size(); i++){
+    for (uint32_t i = 0; i < paths.size(); i++){
         for (const auto& dir_entry : fs::directory_iterator(paths[i])) {
             if (dir_entry.is_regular_file()){
                 const std::string file_path = dir_entry.path().filename().string();
@@ -102,7 +102,7 @@ const char* temp_unix_vars[] = { "TMPDIR", "TMP", "TEMP" };
 
 std::string get_tmp_directory(){
 #ifdef __unix__
-    for (int i = 0; i < sizeof(temp_unix_vars); i++){
+    for (uint32_t i = 0; i < sizeof(temp_unix_vars); i++){
         char* tmp_env = std::getenv(temp_unix_vars[i]);
         if (tmp_env){
             return std::string(tmp_env);

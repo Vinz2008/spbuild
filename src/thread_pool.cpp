@@ -18,7 +18,7 @@ bool HeaderCheck::run(Build& build) {
 
 
 void launch_thread_pool(Build& build){
-    uint thread_nb = get_thread_nb();
-    uint nb_tasks_done = 0;
+    uint32_t thread_nb = get_thread_nb();
+    uint32_t nb_tasks_done = 0;
     //while (nb_tasks_done < build.parallel_tasks.size()){}
 }
