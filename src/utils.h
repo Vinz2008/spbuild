@@ -12,3 +12,5 @@ std::unique_ptr<D> downcast_expr(std::unique_ptr<B> b){
     SubClass.reset(SubClassPtr);
     return SubClass;
 }
+
+int get_thread_nb();

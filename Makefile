@@ -1,6 +1,6 @@
 CXX = g++
 
-CXXFLAGS = -Wall -c -g -std=c++17 -fno-exceptions 
+CXXFLAGS = -Wall -c -g -std=c++17 -fno-exceptions
 #CXXFLAGS += -fsanitize=undefined,address
 
 LDFLAGS = 

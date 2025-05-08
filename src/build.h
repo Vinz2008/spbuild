@@ -8,8 +8,9 @@
 #include <unordered_map>
 #include <memory>
 #include "lang.h"
+#include "thread_pool.h"
 
-
+// TODO : parallelize generating exes (make it a thread pool task)
 class Executable {
 public:
     std::string output_file;
@@ -30,6 +31,7 @@ public:
     std::unordered_map<std::string, std::unique_ptr<Var>> vars;
     std::unordered_map<Language, std::string, EnumClassHash> compiler_paths;
     std::vector<Executable> executables;
+    std::vector<std::unique_ptr<ParallelTask>> parallel_tasks;
     Build(){}
 };
 

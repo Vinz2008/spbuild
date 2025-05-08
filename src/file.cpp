@@ -4,6 +4,11 @@
 
 namespace fs = std::filesystem;
 
+#if defined(_WIN32) || defined(WIN32) 
+#include <windows.h>
+#endif
+
+
 std::string read_file(std::string_view filename){
     std::ifstream f(filename.cbegin(), std::ios::in);
 
@@ -89,3 +94,33 @@ std::string_view strip_file_extension(std::string_view filename){
     fs::path p = filename;
     return p.replace_extension().string();
 }
+
+#ifdef __unix__
+const char* temp_unix_vars[] = { "TMPDIR", "TMP", "TEMP" };
+#endif
+
+
+std::string get_tmp_directory(){
+#ifdef __unix__
+    for (int i = 0; i < sizeof(temp_unix_vars); i++){
+        char* tmp_env = std::getenv(temp_unix_vars[i]);
+        if (tmp_env){
+            return std::string(tmp_env);
+        }
+    }
+
+
+    return "/tmp";
+
+#elif defined(_WIN32) || defined(WIN32)
+    char buf[100];
+    int res = GetTempPathA(100, buf);
+    return std::string(buf);
+#endif
+}
+
+
+std::string append_path(std::string path, std::string add_path){
+    return fs::path(path) / add_path;
+}
+
