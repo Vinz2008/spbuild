@@ -121,6 +121,6 @@ std::string get_tmp_directory(){
 
 
 std::string append_path(std::string path, std::string add_path){
-    return fs::path(path) / add_path;
+    return (fs::path(path) / add_path).string();
 }
 
