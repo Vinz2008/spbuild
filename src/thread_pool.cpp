@@ -8,11 +8,19 @@
 
 std::mutex print_mutex;
 
-void multithreaded_print(const std::string& s){
+void _multithreaded_print(const std::string& s){
     std::unique_lock<std::mutex> lock(print_mutex);
     /*printf("%s", s.c_str());
     fflush(stdout);*/
-    std::cout << "-- " << s << std::flush;
+    std::cout << s << std::flush;
+}
+
+void multithreaded_print_error(const std::string& s){
+    _multithreaded_print("ERROR : " + s);
+}
+
+void multithreaded_print(const std::string& s){
+    _multithreaded_print("-- " + s);
 }
 
 uint32_t get_thread_nb(){
@@ -39,10 +47,11 @@ TaskOutput HeaderCheck::run(Build& build) {
     src_test_f.close();
 
     
-    std::pair<int, std::optional<std::string>> out_cc = run_cmd(c_compiler + " -E " + src_test_path);
+    std::pair<int, std::optional<std::string>> out_cc = run_cmd(c_compiler + " -E " + src_test_path, true);
 
     delete_file(src_test_path);
-    
+
+
     if (out_cc.first != 0){
         // failure
         return TaskOutput(false, "header " + header_name + " not found");
@@ -52,13 +61,24 @@ TaskOutput HeaderCheck::run(Build& build) {
 }
 
 
+std::mutex failed_mutex;
+bool has_failed = false;
+
 static void run_thread(ParallelUniqueQueue<ParallelTask>& queue, Build& build){
     while (!queue.empty()){
         std::unique_ptr<ParallelTask> task = queue.pop();
         if (!task){
             return;
         }
-        task->run(build);
+        TaskOutput task_out = task->run(build);
+        if (!task_out.has_succeeded){
+            multithreaded_print_error(task_out.error_str.value() + "\n");
+
+            {
+                std::unique_lock<std::mutex> lock(failed_mutex);
+                has_failed = true;
+            }
+        }
     }
 }
 
@@ -75,5 +95,9 @@ void launch_thread_pool(Build& build, uint32_t thread_nb){
 
     for (uint32_t i = 0; i < threads.size(); i++){
         threads[i].join();
+    }
+
+    if (has_failed){
+        exit(1);
     }
 }

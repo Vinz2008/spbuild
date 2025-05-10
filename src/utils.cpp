@@ -19,8 +19,13 @@ std::pair<int, std::optional<std::string>> run_cmd(const std::string& cmd, bool 
         }
     }
     int rc = pclose(pipe);
-    if (WEXITSTATUS(rc)){
+    if (rc == -1){
+        // pclose failed
+        exit_status = -1;
+    } else if (WIFEXITED(rc)){
         exit_status = WEXITSTATUS(rc);
+    } else {
+        exit_status = -2;
     }
 
     return std::make_pair(exit_status, result);

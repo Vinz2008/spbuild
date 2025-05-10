@@ -329,13 +329,19 @@ void run_build_tasks(Build& build){
 }
 
 void gen_build(Build build, BackendType backend_type){
-
+    std::stringstream stream;
 
     run_build_tasks(build);
     
 
 
+    /*if (backend_type == MAKEFILE){
+        gen_makefile_clean(stream, all_objs);
+    }*/
+
     std::string file_content = gen_build_backend(std::move(build), backend_type);
+
+    //std::string file_content = stream.str();
 
     std::string out_filename = get_out_filename(backend_type);
     std::ofstream f(out_filename);
