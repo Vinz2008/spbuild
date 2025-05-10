@@ -2,9 +2,11 @@ CXX = g++
 
 CXXFLAGS = -Wall -c -g -std=c++17 -fno-exceptions
 #CXXFLAGS += -fsanitize=undefined,address
+#CXXFLAGS += -pg
 
 LDFLAGS = 
 #LDFLAGS += -fsanitize=undefined,address
+#LDFLAGS += -pg
 
 SRCDIR = src
 
