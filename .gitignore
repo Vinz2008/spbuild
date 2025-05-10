@@ -6,3 +6,4 @@ build.ninja
 demo
 demo2
 spbuild.exe
+test-runner
