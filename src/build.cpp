@@ -250,40 +250,44 @@ static void gen_source_target(BackendType backend_type, std::stringstream& strea
     targets_added.insert(object_file);
 }
 
-static std::string gen_build_backend(Build build, BackendType backend_type){
-    std::stringstream stream;
+static void add_build_prelude(std::stringstream& stream, Build& build, BackendType backend_type){
     add_language_support(build, backend_type, C, stream);
-
     set_ldflags_global(/*backend_type,*/ stream);
 
     if (backend_type != MAKEFILE){
         add_generic_linker_rule(backend_type, stream);
     }
 
-
     if (backend_type == MAKEFILE){
         add_makefile_all_target(build, stream);
     }
+}
+
+static void gen_build_exe(std::stringstream& stream, Build& build, BackendType backend_type, std::vector<std::string>& all_objs, Executable exe){
+    std::vector<std::string> objs = get_obj_files(exe.sources);    
+
+    gen_exe_target(backend_type, stream, exe.output_file, objs, exe.libraries);
+        
+
+    for (uint32_t j = 0; j < exe.sources.size(); j++){
+        std::string source_file = exe.sources[j];
+        std::string object_file = objs[j];
+        gen_source_target(backend_type, stream, source_file, object_file);
+    }
+        
+    all_objs.push_back(exe.output_file);
+    all_objs.insert(all_objs.end(), objs.begin(), objs.end());
+}
+
+static std::string gen_build_backend(Build build, BackendType backend_type){
+    std::stringstream stream;
+
+    add_build_prelude(stream, build, backend_type);
 
     std::vector<std::string> all_objs;
 
     for (uint32_t i = 0; i < build.executables.size(); i++){
-        
-        
-        std::vector<std::string> objs = get_obj_files(build.executables[i].sources);
-        
-
-        gen_exe_target(backend_type, stream, build.executables[i].output_file, objs, build.executables[i].libraries);
-        
-
-        for (uint32_t j = 0; j < build.executables[i].sources.size(); j++){
-            std::string source_file = build.executables[i].sources[j];
-            std::string object_file = objs[j];
-            gen_source_target(backend_type, stream, source_file, object_file);
-        }
-        
-        all_objs.push_back(build.executables[i].output_file);
-        all_objs.insert(all_objs.end(), objs.begin(), objs.end());
+        gen_build_exe(stream, build, backend_type, all_objs, build.executables[i]);
     }
 
     if (backend_type == MAKEFILE){
@@ -325,6 +329,8 @@ void run_build_tasks(Build& build){
 }
 
 void gen_build(Build build, BackendType backend_type){
+
+
     run_build_tasks(build);
     
 
