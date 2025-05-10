@@ -25,14 +25,14 @@ void interpret_toplevel_function_call(Build& build, std::string_view function_na
     } else if (function_name == "cc"){
         std::unique_ptr<String> cc_path = downcast_expr<String>(std::move(args[0]));
         build.compiler_paths[C] = cc_path->s; 
-    } else if (function_name == "header_check"){
+    } else if (function_name == "check_header"){
         std::unique_ptr<String> header_name = downcast_expr<String>(std::move(args[0]));
         std::string header_define = ""; 
-        if (args.size() >= 1){
-            std::unique_ptr<String> header_define_expr = downcast_expr<String>(std::move(args[0]));
+        if (args.size() > 1){
+            std::unique_ptr<String> header_define_expr = downcast_expr<String>(std::move(args[1]));
             header_define = header_define_expr->s;
         }
-        build.parallel_tasks.push_back(std::make_unique<HeaderCheck>(header_name->s, header_define));
+        build.parallel_tasks.push(std::make_unique<HeaderCheck>(header_name->s, header_define));
     } else {
         fprintf(stderr, "ERROR : unknown toplevel function name %s\n", function_name.data());
     }
@@ -306,8 +306,27 @@ static std::string get_out_filename(BackendType backend_type){
     }
 }
 
+void run_build_tasks(Build& build){
+    uint32_t thread_nb = get_thread_nb();
+    if (build.parallel_tasks.size() < 2){
+        // not enough tasks to justify the creation of the thread pool.
+        // do it sequentially
+        while (!build.parallel_tasks.empty()){
+            TaskOutput task_out = build.parallel_tasks.front()->run(build);
+            build.parallel_tasks.pop();
+            if (!task_out.has_succeeded){
+
+            }
+        }
+    } else {
+        launch_thread_pool(build, thread_nb);
+    }
+    
+}
+
 void gen_build(Build build, BackendType backend_type){
-    launch_thread_pool(build);
+    run_build_tasks(build);
+    
 
 
     std::string file_content = gen_build_backend(std::move(build), backend_type);

@@ -31,7 +31,7 @@ public:
     std::unordered_map<std::string, std::unique_ptr<Var>> vars;
     std::unordered_map<Language, std::string, EnumClassHash> compiler_paths;
     std::vector<Executable> executables;
-    std::vector<std::unique_ptr<ParallelTask>> parallel_tasks;
+    std::queue<std::unique_ptr<ParallelTask>> parallel_tasks;
     Build(){}
 };
 

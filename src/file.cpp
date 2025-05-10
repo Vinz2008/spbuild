@@ -90,9 +90,9 @@ bool exe_is_in_path(std::string program){
 
 
 
-std::string_view strip_file_extension(std::string_view filename){
+std::string strip_file_extension(std::string_view filename){
     fs::path p = filename;
-    return p.replace_extension().string();
+    return p.stem().string();
 }
 
 #ifdef __unix__
@@ -102,7 +102,7 @@ const char* temp_unix_vars[] = { "TMPDIR", "TMP", "TEMP" };
 
 std::string get_tmp_directory(){
 #ifdef __unix__
-    for (uint32_t i = 0; i < sizeof(temp_unix_vars); i++){
+    for (uint32_t i = 0; i < sizeof(temp_unix_vars)/sizeof(temp_unix_vars[0]); i++){
         char* tmp_env = std::getenv(temp_unix_vars[i]);
         if (tmp_env){
             return std::string(tmp_env);
@@ -124,3 +124,6 @@ std::string append_path(std::string path, std::string add_path){
     return (fs::path(path) / add_path).string();
 }
 
+bool delete_file(std::string_view path){
+    return fs::remove(path);
+}
