@@ -8,26 +8,37 @@
 
 std::mutex print_mutex;
 
-void _multithreaded_print(const std::string& s){
+static void _multithreaded_print(const std::string& s){
     std::unique_lock<std::mutex> lock(print_mutex);
     /*printf("%s", s.c_str());
     fflush(stdout);*/
     std::cout << s << std::flush;
 }
 
-void multithreaded_print_error(const std::string& s){
+static void multithreaded_print_error(const std::string& s){
     _multithreaded_print("ERROR : " + s);
 }
 
-void multithreaded_print(const std::string& s){
+static void multithreaded_print(const std::string& s){
     _multithreaded_print("-- " + s);
 }
+
+ParallelVector<std::string> threads_streams;
+ParallelVector<std::vector<std::string>> threads_all_objs;
 
 uint32_t get_thread_nb(){
     return std::thread::hardware_concurrency();
 }
 
-TaskOutput HeaderCheck::run(Build& build) {
+TaskOutput Executable::run(Build& build, BackendType backend_type) {
+    std::stringstream stream;
+    std::vector<std::string> all_objs;
+    // TODO : make gen_build_exe return a bool instead of crashing on error
+    gen_build_exe(stream, build, backend_type, all_objs, *this);
+    return TaskOutput(true, stream.str(), all_objs);
+}
+
+TaskOutput HeaderCheck::run(Build& build, BackendType backend_type){
     multithreaded_print("checking " + header_name + "        \n");
     std::string c_compiler = "cc";
     if (build.compiler_paths.find(C) != build.compiler_paths.end()){
@@ -64,13 +75,15 @@ TaskOutput HeaderCheck::run(Build& build) {
 std::mutex failed_mutex;
 bool has_failed = false;
 
-static void run_thread(ParallelUniqueQueue<ParallelTask>& queue, Build& build){
+static void run_thread(ParallelUniqueQueue<ParallelTask>& queue, Build& build, BackendType backend_type){
+    std::stringstream stream;
+    std::vector<std::string> all_objs;
     while (!queue.empty()){
         std::unique_ptr<ParallelTask> task = queue.pop();
         if (!task){
             return;
         }
-        TaskOutput task_out = task->run(build);
+        TaskOutput task_out = task->run(build, backend_type);
         if (!task_out.has_succeeded){
             multithreaded_print_error(task_out.error_str.value() + "\n");
 
@@ -78,18 +91,24 @@ static void run_thread(ParallelUniqueQueue<ParallelTask>& queue, Build& build){
                 std::unique_lock<std::mutex> lock(failed_mutex);
                 has_failed = true;
             }
+        } else {
+            stream << task_out.build_stream_str;
+            all_objs.insert(all_objs.end(), task_out.all_objs.begin(), task_out.all_objs.end());
         }
     }
+
+    threads_streams.push_back(stream.str());
+    threads_all_objs.push_back(all_objs);
 }
 
-void launch_thread_pool(Build& build, uint32_t thread_nb){
+void launch_thread_pool(std::stringstream& stream, std::vector<std::string>& all_objs, Build& build, BackendType backend_type, uint32_t thread_nb){
     std::vector<std::thread> threads;
     thread_nb = std::min(build.parallel_tasks.size(), (size_t)thread_nb);
 
     ParallelUniqueQueue<ParallelTask> queue(std::move(build.parallel_tasks));
     threads.reserve(thread_nb);
     for (uint32_t i = 0; i < thread_nb; i++){
-        threads.push_back(std::thread(run_thread, std::ref(queue),  std::ref(build)));
+        threads.push_back(std::thread(run_thread, std::ref(queue),  std::ref(build), backend_type));
     }
 
 
@@ -99,5 +118,18 @@ void launch_thread_pool(Build& build, uint32_t thread_nb){
 
     if (has_failed){
         exit(1);
+    }
+
+    std::vector<std::string> threads_streams_vec = threads_streams.get_vec();
+
+    for (uint32_t i = 0; i < threads_streams_vec.size(); i++){
+        stream << threads_streams_vec[i];
+    }
+
+    std::vector<std::vector<std::string>> threads_all_objs_vec = threads_all_objs.get_vec();
+
+
+    for (uint32_t i = 0; i < threads_all_objs_vec.size(); i++){
+        all_objs.insert(all_objs.end(), threads_all_objs_vec[i].begin(), threads_all_objs_vec[i].end());
     }
 }

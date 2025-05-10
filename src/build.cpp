@@ -6,10 +6,12 @@
 #include "utils.h"
 #include "file.h"
 #include "lang.h"
+#include "thread_pool.h"
 
 static const std::string_view ldflags_global = std::string_view("ldflags_global");
 
 // deduplicated targets, there could be a problem with different cflags/configs (TODO)
+std::mutex targets_added_mutex;
 std::set<std::string> targets_added;
 
 void interpret_toplevel_function_call(Build& build, std::string_view function_name, std::vector<std::unique_ptr<Expr>> args){
@@ -21,7 +23,9 @@ void interpret_toplevel_function_call(Build& build, std::string_view function_na
             std::unique_ptr<Array> libraries_expr = downcast_expr<Array>(std::move(args[2]));
             libraries = libraries_expr->arr;
         }
-        build.executables.push_back(Executable(out_filename->s, sources->arr, libraries));
+        auto exe = Executable(out_filename->s, sources->arr, libraries);
+        build.parallel_tasks.push(std::make_unique<Executable>(exe));
+        build.executables.push_back(exe);
     } else if (function_name == "cc"){
         std::unique_ptr<String> cc_path = downcast_expr<String>(std::move(args[0]));
         build.compiler_paths[C] = cc_path->s; 
@@ -227,7 +231,11 @@ static void gen_exe_target(BackendType backend_type, std::stringstream& stream, 
             stream << "  ldflags = $" << ldflags_specific_name << "\n\n";
             break;
     }
-    targets_added.insert(output_file);
+    {
+        std::unique_lock<std::mutex> lock(targets_added_mutex);
+        targets_added.insert(output_file);
+    }
+    
     
 }
 
@@ -247,7 +255,10 @@ static void gen_source_target(BackendType backend_type, std::stringstream& strea
             break;
     }
 
-    targets_added.insert(object_file);
+    {
+        std::unique_lock<std::mutex> lock(targets_added_mutex);
+        targets_added.insert(object_file);
+    }
 }
 
 static void add_build_prelude(std::stringstream& stream, Build& build, BackendType backend_type){
@@ -263,7 +274,7 @@ static void add_build_prelude(std::stringstream& stream, Build& build, BackendTy
     }
 }
 
-static void gen_build_exe(std::stringstream& stream, Build& build, BackendType backend_type, std::vector<std::string>& all_objs, Executable exe){
+void gen_build_exe(std::stringstream& stream, Build& build, BackendType backend_type, std::vector<std::string>& all_objs, Executable exe){
     std::vector<std::string> objs = get_obj_files(exe.sources);    
 
     gen_exe_target(backend_type, stream, exe.output_file, objs, exe.libraries);
@@ -279,7 +290,7 @@ static void gen_build_exe(std::stringstream& stream, Build& build, BackendType b
     all_objs.insert(all_objs.end(), objs.begin(), objs.end());
 }
 
-static std::string gen_build_backend(Build build, BackendType backend_type){
+/*static std::string gen_build_backend(Build build, BackendType backend_type){
     std::stringstream stream;
 
     add_build_prelude(stream, build, backend_type);
@@ -296,7 +307,7 @@ static std::string gen_build_backend(Build build, BackendType backend_type){
     
     
     return stream.str();
-}
+}*/
 
 static std::string get_out_filename(BackendType backend_type){
     switch (backend_type){
@@ -310,38 +321,48 @@ static std::string get_out_filename(BackendType backend_type){
     }
 }
 
-void run_build_tasks(Build& build){
+void run_build_tasks(std::stringstream& stream, std::vector<std::string>& all_objs, Build& build, BackendType backend_type){
+    
     uint32_t thread_nb = get_thread_nb();
     if (build.parallel_tasks.size() < 2){
         // not enough tasks to justify the creation of the thread pool.
         // do it sequentially
         while (!build.parallel_tasks.empty()){
-            TaskOutput task_out = build.parallel_tasks.front()->run(build);
+            TaskOutput task_out = build.parallel_tasks.front()->run(build, backend_type);
             build.parallel_tasks.pop();
             if (!task_out.has_succeeded){
-
+                // TODO
             }
+            if (task_out.build_stream_str != ""){
+                stream << task_out.build_stream_str;
+            }
+            all_objs.insert(all_objs.end(), task_out.all_objs.begin(), task_out.all_objs.end());
+            
         }
+
     } else {
-        launch_thread_pool(build, thread_nb);
+        launch_thread_pool(stream, all_objs, build, backend_type, thread_nb);
     }
     
 }
 
 void gen_build(Build build, BackendType backend_type){
     std::stringstream stream;
+    std::vector<std::string> all_objs;
 
-    run_build_tasks(build);
+    add_build_prelude(stream, build, backend_type);
+
+    run_build_tasks(stream, all_objs, build, backend_type);
     
 
 
-    /*if (backend_type == MAKEFILE){
+    if (backend_type == MAKEFILE){
         gen_makefile_clean(stream, all_objs);
-    }*/
+    }
 
-    std::string file_content = gen_build_backend(std::move(build), backend_type);
+    //std::string file_content = gen_build_backend(std::move(build), backend_type);
 
-    //std::string file_content = stream.str();
+    std::string file_content = stream.str();
 
     std::string out_filename = get_out_filename(backend_type);
     std::ofstream f(out_filename);

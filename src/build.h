@@ -11,13 +11,13 @@
 #include "thread_pool.h"
 
 // TODO : parallelize generating exes (make it a thread pool task)
-class Executable {
+/*class Executable {
 public:
     std::string output_file;
     std::vector<std::string> sources;
     std::vector<std::string> libraries;
     Executable(std::string output_file, std::vector<std::string> sources, std::vector<std::string> libraries) : output_file(output_file), sources(sources), libraries(libraries) {}
-};
+};*/
 
 class Var {
 public:
@@ -31,6 +31,7 @@ public:
     std::unordered_map<std::string, std::unique_ptr<Var>> vars;
     std::unordered_map<Language, std::string, EnumClassHash> compiler_paths;
     std::vector<Executable> executables;
+    // TODO : sort the queue to put executables (slow things) at the end and check (fast things) at the start
     std::queue<std::unique_ptr<ParallelTask>> parallel_tasks;
     Build(){}
 };
@@ -41,6 +42,7 @@ std::unique_ptr<Expr> interpret_expr_function_call(std::string_view function_nam
 
 BackendType parse_backend_type(std::string backend_str);
 
+void gen_build_exe(std::stringstream& stream, Build& build, BackendType backend_type, std::vector<std::string>& all_objs, Executable exe);
 void gen_build(Build build, BackendType backend_type);
 
 #endif
